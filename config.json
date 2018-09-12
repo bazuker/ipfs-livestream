@@ -1,0 +1,7 @@
+{
+  "ffmpeg": "/Users/kisulken/Documents/user/tools/ffmpeg",
+  "ipfs": "/Users/kisulken/Documents/user/tools/go-ipfs/ipfs",
+  "ipget": "/Users/kisulken/Documents/user/tools/ipget/ipget",
+  "samples_path": "/Users/kisulken/go/src/ipfs-livestream/samples",
+  "sample_duration": 10000000000
+}

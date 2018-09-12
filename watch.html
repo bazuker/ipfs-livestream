@@ -1,0 +1,226 @@
+<!DOCTYPE html> 
+<html> 
+<head>
+<style>
+.loader {
+  border: 16px solid #f3f3f3;
+  border-radius: 50%;
+  border-top: 16px solid #3498db;
+  width: 120px;
+  height: 120px;
+  -webkit-animation: spin 2s linear infinite; /* Safari */
+  animation: spin 2s linear infinite;
+}
+
+/* Safari */
+@-webkit-keyframes spin {
+  0% { -webkit-transform: rotate(0deg); }
+  100% { -webkit-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+</style>
+</head>
+<body> 
+
+<div style="text-align:center"> 
+  <button onclick="join()">Reload the stream</button> 
+  <button onclick="playPause()">Play/Pause</button> 
+  <button onclick="makeBig()">Big</button>
+  <button onclick="makeSmall()">Small</button>
+  <button onclick="makeNormal()">Normal</button>
+  <br><br>
+  <center><div name="progressBar" id="progressBar" class="loader"><br><b>Loading the stream</b></div></center>
+  <video id="stream" preload="auto" width="420" src="" type="video/mp4">
+    Your browser does not support HTML5 video.
+  </video>
+  <video id="streamBuffer" preload="auto" width="420" src="" type="video/mp4">
+    Your browser does not support HTML5 video buffer.
+  </video>
+</div> 
+
+<script> 
+const daemonIp = "http://127.0.0.1:8080/ipfs/";
+const hostIp = "http://127.0.0.1:8888/sync";
+
+var myVideo = document.getElementById("stream"); 
+var buffer = document.getElementById("streamBuffer");
+var progressBar = document.getElementById("progressBar");
+var parts = [];
+var currentPart = 0;
+var bufferedPart = -1;
+var streamCreatedDate = "";
+
+hideProgress();
+
+buffer.onended = function() {
+    currentPart++;
+    if (parts.length > 0 && currentPart < parts.length) {
+      if (bufferedPart == currentPart) {
+        buffer.style.visibility = 'hidden';
+        myVideo.style.visibility = 'visible';
+        myVideo.play();
+        return;
+      } 
+      continueStream(daemonIp + parts[currentPart]);
+    } else {
+      showProgress();
+      console.log("waiting for the parts..");
+    }
+};
+
+myVideo.onended = function() {
+    currentPart++;
+    continueVideo();
+};
+
+myVideo.addEventListener('canplay', function() {
+    myVideo.style.visibility = 'visible';
+});
+
+var getJSON = function(url, callback) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', url, true);
+    xhr.responseType = 'json';
+    xhr.onload = function() {
+      var status = xhr.status;
+      if (status === 200) {
+        callback(null, xhr.response);
+      } else {
+        callback(status, xhr.response);
+      }
+    };
+    xhr.send();
+};
+
+function continueVideo() {
+  // if the stream has changed
+  if (currentPart - 2 > parts.length) {
+    currentPart = 0;
+  }
+  if (parts.length > 0 && currentPart < parts.length) 
+  {
+      if (bufferedPart == currentPart) 
+      {
+        if (currentPart + 1 < parts.length) 
+        {
+          myVideo.pause();
+          myVideo.setAttribute('src', addr); 
+          myVideo.load();
+        }
+        myVideo.style.visibility = 'hidden';
+        buffer.style.visibility = 'visible';
+        buffer.play();
+        return;
+      } 
+      continueStream(daemonIp + parts[currentPart]);
+    } 
+    else {
+      showProgress();
+      console.log("waiting for the parts..");
+      setTimeout(updateParts, 2000);
+    }
+}
+
+function updateParts() {
+   getJSON(hostIp, partUpdatCallback);
+}
+
+function partUpdatCallback(status, response) {
+    parts = response['parts'];
+    if (streamCreatedDate !== response['started']) {
+      streamCreatedDate = response['started'];
+      currentPart = 0;
+      console.log("stream has changed")
+    }
+    continueVideo();
+}
+
+function hideProgress() {
+  progressBar.style.display = 'none';
+  progressBar.style.visibility = 'hidden';
+  myVideo.style.visibility = 'visible';
+}
+
+function showProgress() {
+  progressBar.style.display = 'block'; 
+  progressBar.style.visibility = 'visible';
+  myVideo.style.visibility = 'hidden';
+}
+
+function joinCallback(status, response) {
+  //console.log(status, response);
+  parts = response['parts'];
+  streamCreatedDate = response['started'];
+  if (parts.length > 0 && currentPart < parts.length) {
+    console.log("stream now has", parts.length, "parts");
+    currentPart = 0;
+    bufferedPart = -1;
+    continueStream(daemonIp + parts[currentPart]);
+  }
+}
+
+function join() {
+  getJSON(hostIp, joinCallback);
+  myVideo.addEventListener('error', function(msg) {
+      showProgress();
+      alert('Stream was interrupted. Trying to reconnect...', msg);
+  });
+}
+
+async function bufferStream(addr) {
+  console.log("buffering", addr);
+  if (myVideo.style.visibility === 'hidden') {
+    myVideo.pause();
+    myVideo.setAttribute('src', addr); 
+    await myVideo.load();
+    myVideo.style.visibility = 'hidden';
+  } else {
+    buffer.pause();
+    buffer.setAttribute('src', addr); 
+    await buffer.load();
+    buffer.style.visibility = 'hidden';
+  }
+}
+
+async function continueStream(addr) {
+  console.log("continuing on", addr);
+  hideProgress();
+  myVideo.pause();
+  myVideo.setAttribute('src', addr); 
+  await myVideo.load();
+  myVideo.play();
+  if (currentPart + 1  < parts.length) {
+        currentPart++;
+        bufferedPart = currentPart;
+        bufferStream(daemonIp + parts[currentPart])
+        return;
+  }
+}
+
+function playPause() { 
+    if (myVideo.paused) {
+      hideProgress();
+      myVideo.play(); 
+    }
+    else myVideo.pause(); 
+} 
+
+function makeBig() { 
+    myVideo.width = 1080; 
+} 
+
+function makeSmall() { 
+    myVideo.width = 420; 
+} 
+
+function makeNormal() { 
+    myVideo.width = 720; 
+} 
+</script> 
+
+</body> 
+</html>

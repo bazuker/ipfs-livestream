@@ -15,6 +15,7 @@ To begin you will need the following binary executables:
 1. [ipfs](https://dist.ipfs.io/#go-ipfs)
 2. [ipget](https://dist.ipfs.io/#ipget)
 3. [ffmpeg](https://www.ffmpeg.org/download.html)
+4. Optional [fileserver](https://github.com/kisulken/fileserver/releases)
 
 After downloading, fill the paths into config.json.
 

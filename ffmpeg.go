@@ -95,12 +95,13 @@ func (c *FFMpegController) GetAvailableDevices() (*Devices, error) {
 				videoList = true
 			} else if clean == "AVFoundation audio devices:" {
 				videoList = false
+			} else {
+				if videoList {
+					devices.Video = append(devices.Video, clean)
+					continue
+				}
+				devices.Audio = append(devices.Audio, clean)
 			}
-			if videoList {
-				devices.Video = append(devices.Video, clean)
-				continue
-			}
-			devices.Audio = append(devices.Audio, clean)
 		}
 		return devices, nil
 	}

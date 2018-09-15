@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/go-playground/lars"
+	"github.com/pkg/errors"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -15,21 +16,21 @@ import (
 const syncFile = "sync.json"
 
 type Livestream struct {
-	Parts          []string 	 `json:"parts"`
+	Parts          []string      `json:"parts"`
 	TempSample     string        `json:"-"`
 	SampleCursor   int32         `json:"cursor"`
 	SampleDuration time.Duration `json:"sample"`
-	Ended	   	   bool			 `json:"ended"`
-	Started        string		 `json:"started"`
-	Updated        string		 `json:"updated"`
+	Ended          bool          `json:"ended"`
+	Started        string        `json:"started"`
+	Updated        string        `json:"updated"`
 
 	dataFolder string `json:"-"`
 
-	ipfsController *IPFSController `json:"-"`
+	ipfsController   *IPFSController   `json:"-"`
 	ffmpegController *FFMpegController `json:"-"`
 
-	_sync int32 `json:"-"`
-	_lastSync int32 `json:"-"`
+	_sync          int32  `json:"-"`
+	_lastSync      int32  `json:"-"`
 	_syncfileCache []byte `json:"-"`
 }
 
@@ -55,6 +56,24 @@ func (ls *Livestream) watchSync(c lars.Context) {
 	c.Response().Header().Set("Content-Type", "application/json")
 	c.Response().Write(ls._syncfileCache)
 	c.Response().WriteHeader(http.StatusOK)
+}
+
+func (ls *Livestream) UseDefaultDevices() error {
+	devices, err := ls.ffmpegController.GetAvailableDevices()
+	if err != nil {
+		return err
+	}
+	if len(devices.Video) < 1 || len(devices.Audio) < 1 {
+		return errors.New("video or audio device is unavailable")
+	}
+	ls.ffmpegController.videoDevice = devices.Video[0]
+	ls.ffmpegController.audioDevice = devices.Audio[0]
+	return nil
+}
+
+func (ls *Livestream) SetDevices(videoDevice, audioDevice string) {
+	ls.ffmpegController.videoDevice = videoDevice
+	ls.ffmpegController.audioDevice = audioDevice
 }
 
 func (ls *Livestream) Watch(address string) error {
@@ -131,6 +150,9 @@ func (ls *Livestream) Broadcast(samples int) error {
 			}
 		}
 		if ls.SampleCursor > 0 {
+			if !fileExists(ls.TempSample) {
+				return errors.New("sample does not exist or was not recorded")
+			}
 			go ls.pushSample(ls.TempSample)
 		}
 		// record the screen
@@ -177,7 +199,7 @@ func (ls *Livestream) safeSync() {
 		log.Println("failed to encode the sync.json due", err.Error())
 		return
 	}
-	err = ioutil.WriteFile(ls.dataFolder + "/" + syncFile, data, os.ModePerm)
+	err = ioutil.WriteFile(ls.dataFolder+"/"+syncFile, data, os.ModePerm)
 	if err != nil {
 		log.Println("failed to write to sync.json due", err.Error())
 		return
@@ -194,7 +216,7 @@ func (ls *Livestream) sync() error {
 		return nil
 	}
 	ls.Updated = time.Now().String()
-		atomic.StoreInt32(&ls._sync, ls.SampleCursor)
+	atomic.StoreInt32(&ls._sync, ls.SampleCursor)
 	defer atomic.StoreInt32(&ls._sync, 0)
 	hash, err := ls.ipfsController.PushFile(ls.dataFolder + "/" + syncFile)
 	if err != nil {

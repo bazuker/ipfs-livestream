@@ -53,10 +53,14 @@ func main() {
 	if *samplesPtr == -1 {
 		log.Println("stream length is unlimited")
 	} else {
-		log.Println("stream length is ", time.Duration(int(config.SampleDuration) * (*samplesPtr)))
+		log.Println("stream length is ", time.Duration(int(config.SampleDuration)*(*samplesPtr)))
 	}
 
 	stream := NewLivestream(config.FFmpeg, config.IPFS, config.IPGet, config.SamplesPath, config.SampleDuration)
+	err = stream.UseDefaultDevices() // use first devices from the list
+	if err != nil {
+		panic(err)
+	}
 	if watchPtr != nil && hostAddrLen > 1 {
 		err = stream.Watch(*watchPtr)
 	} else {

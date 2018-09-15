@@ -26,7 +26,7 @@ func (c *Controller) ExecutePath(path string, args []string) ([]byte, error) {
 	cmd.Stderr = &stderr
 	err := cmd.Run()
 	if err != nil {
-		return nil, errors.New(fmt.Sprint(err) + ": " + stderr.String())
+		return stderr.Bytes(), errors.New(fmt.Sprint(err) + ": " + stderr.String())
 	}
 	return out.Bytes(), nil
 }
@@ -39,7 +39,7 @@ func (c *Controller) ExecutePathWithDuration(path string, args []string, maxDura
 	cmd.Stderr = &stderr
 	err := cmd.Start()
 	if err != nil {
-		return nil, errors.New(fmt.Sprint(err) + ": " + stderr.String())
+		return stderr.Bytes(), errors.New(fmt.Sprint(err) + ": " + stderr.String())
 	}
 	done := make(chan error, 1)
 	go func() {

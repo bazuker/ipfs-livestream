@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"ipfs-livestream/cliexec"
 	"path"
@@ -44,39 +45,67 @@ func (c *FFMpegController) RecordScreen(filename string, length time.Duration) e
 }
 
 func (c *FFMpegController) GetAvailableDevices() (*Devices, error) {
-	const immediateExit = "Immediate exit requested"
-	const immediateExitLen = len(immediateExit)
-	data, err := c.ExecutePath(c.ffmpeg, []string{"-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"})
-	output := strings.TrimSpace(string(data))
-	if err != nil {
-		// for some reason "immediate exit requested" is interpreted as error on windows
-		// so we have to work around that
-		size := len(output)
-		if size < immediateExitLen || output[size-immediateExitLen:] != immediateExit {
-			return nil, err
-		}
-	}
-	devices := &Devices{make([]string, 0), make([]string, 0)}
-	// now a little bit of black magic to parse the output of ffmpeg
-	lines := strings.Split(output, "[")
-	videoList := false
-	for _, line := range lines {
-		if len(line) > 2 {
-			clean := strings.TrimSpace(line[strings.IndexRune(line, ']')+1:])
-			if strings.HasPrefix(clean, "DirectShow video devices") {
-				videoList = true
-			} else if strings.HasSuffix(clean, "DirectShow audio devices") {
-				videoList = false
-			} else if !strings.HasPrefix(clean, "Alternative name") {
-				if videoList {
-					devices.Video = append(devices.Video, clean)
-					continue
-				}
-				devices.Audio = append(devices.Audio, clean)
+	if runtime.GOOS == "windows" {
+		const immediateExit = "Immediate exit requested"
+		const immediateExitLen = len(immediateExit)
+		data, err := c.ExecutePath(c.ffmpeg, []string{"-hide_banner", "-list_devices", "true", "-f", "dshow", "-i", "dummy"})
+		output := strings.TrimSpace(string(data))
+		if err != nil {
+			// for some reason "immediate exit requested" is interpreted as error on windows
+			// so we have to work around that
+			size := len(output)
+			if size < immediateExitLen || output[size-immediateExitLen:] != immediateExit {
+				return nil, err
 			}
 		}
+		devices := &Devices{make([]string, 0), make([]string, 0)}
+		// now a little bit of black magic to parse the output of ffmpeg
+		lines := strings.Split(output, "[")
+		videoList := false
+		for _, line := range lines {
+			if len(line) > 2 {
+				clean := strings.TrimSpace(line[strings.IndexRune(line, ']')+1:])
+				if strings.HasPrefix(clean, "DirectShow video devices") {
+					videoList = true
+				} else if strings.HasSuffix(clean, "DirectShow audio devices") {
+					videoList = false
+				} else if !strings.HasPrefix(clean, "Alternative name") {
+					if videoList {
+						devices.Video = append(devices.Video, clean)
+						continue
+					}
+					devices.Audio = append(devices.Audio, clean)
+				}
+			}
+		}
+		return devices, nil
 	}
-	return devices, nil
+
+	if runtime.GOOS == "darwin" {
+		data, _ := c.ExecutePath(c.ffmpeg, []string{"-hide_banner", "-f", "avfoundation", "-list_devices", "true", "-i", ""})
+		output := strings.TrimSpace(string(data))
+
+		devices := &Devices{make([]string, 0), make([]string, 0)}
+		// now a little bit of black magic to parse the output of ffmpeg
+		videoList := false
+		lines := strings.Split(output, "\n")
+		for _, line := range lines {
+			clean := strings.TrimSpace(line[strings.IndexRune(line, ']')+1:])
+			if clean == "AVFoundation video devices:" {
+				videoList = true
+			} else if clean == "AVFoundation audio devices:" {
+				videoList = false
+			}
+			if videoList {
+				devices.Video = append(devices.Video, clean)
+				continue
+			}
+			devices.Audio = append(devices.Audio, clean)
+		}
+		return devices, nil
+	}
+
+	return nil, errors.New("unsupported os")
 }
 
 func (c *FFMpegController) ConvertVideo(filename, newExtension string) (string, error) {

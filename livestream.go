@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"runtime"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -66,8 +67,13 @@ func (ls *Livestream) UseDefaultDevices() error {
 	if len(devices.Video) < 1 || len(devices.Audio) < 1 {
 		return errors.New("video or audio device is unavailable")
 	}
-	ls.ffmpegController.videoDevice = devices.Video[0]
-	ls.ffmpegController.audioDevice = devices.Audio[0]
+	if runtime.GOOS == "windows" {
+		ls.ffmpegController.videoDevice = devices.Video[0]
+		ls.ffmpegController.audioDevice = devices.Audio[0]
+	} else {
+		ls.ffmpegController.videoDevice = strconv.Itoa(len(devices.Video) - 1)
+		ls.ffmpegController.audioDevice = "0"
+	}
 	return nil
 }
 

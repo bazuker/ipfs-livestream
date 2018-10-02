@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"github.com/go-playground/lars"
 	"github.com/pkg/errors"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -35,7 +36,7 @@ type Livestream struct {
 	_syncfileCache []byte `json:"-"`
 }
 
-func NewLivestream(ffmpeg, ipfs, ipget, dataFolder string, sampleDuration time.Duration) *Livestream {
+func NewLivestream(ffmpeg, ipfs, dataFolder string, sampleDuration time.Duration) *Livestream {
 	return &Livestream{
 		dataFolder:       dataFolder,
 		Parts:            make([]string, 0),
@@ -43,7 +44,7 @@ func NewLivestream(ffmpeg, ipfs, ipget, dataFolder string, sampleDuration time.D
 		SampleCursor:     0,
 		SampleDuration:   sampleDuration,
 		Ended:            false,
-		ipfsController:   NewIPFSController(ipfs, ipget),
+		ipfsController:   NewIPFSController(ipfs),
 		ffmpegController: NewFFMpegController(ffmpeg),
 	}
 }
@@ -82,9 +83,9 @@ func (ls *Livestream) SetDevices(videoDevice, audioDevice string) {
 	ls.ffmpegController.audioDevice = audioDevice
 }
 
-func (ls *Livestream) Watch(address string) error {
+func (ls *Livestream) Watch(ipnsAddress string) error {
 	var err error
-	log.Println("reading the stream", address)
+	log.Println("reading the stream", ipnsAddress)
 
 	router := lars.New()
 	router.Use(enableCors)
@@ -98,7 +99,7 @@ func (ls *Livestream) Watch(address string) error {
 	for !ls.Ended {
 		log.Println("checking for updates...")
 		syncPath := ls.dataFolder + "/" + syncFile
-		err = ls.ipfsController.GetResource(syncPath, address, true)
+		err = IpnsDownloadFile(ipnsAddress, syncPath)
 		if err != nil {
 			return err
 		}
@@ -231,4 +232,30 @@ func (ls *Livestream) sync() error {
 	err = ls.ipfsController.PublishName(hash)
 	log.Println("synchronization is over for", hash)
 	return err
+}
+
+func IpnsDownloadFile(peerId, newFilename string) (err error) {
+	out, err := os.Create(newFilename)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Get the data
+	resp, err := http.Get("http://127.0.0.1:8080/ipns/" + peerId)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.New("failed to download the file, response code " + strconv.Itoa(resp.StatusCode))
+	}
+
+	_, err = io.Copy(out, resp.Body)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

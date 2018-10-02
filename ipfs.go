@@ -11,8 +11,7 @@ import (
 )
 
 type IPFSController struct {
-	ipfsPath string
-	ipgetPath string
+	ipfsPath      string
 	daemonProcess *os.Process
 
 	cliexec.Controller
@@ -26,21 +25,12 @@ type PersonalId struct {
 	ProtocolVersion string   `json:"ProtocolVersion"`
 }
 
-func NewIPFSController(ipfsPath, ipgetPath string) *IPFSController {
-	return &IPFSController{ipfsPath, ipgetPath, nil, cliexec.Controller{}}
+func NewIPFSController(ipfsPath string) *IPFSController {
+	return &IPFSController{ipfsPath, nil, cliexec.Controller{}}
 }
 
 func genericError(err error, data []byte) error {
 	return errors.New(err.Error() + " " + string(data))
-}
-
-func (c *IPFSController) GetResource(newName, address string, ipns bool) (err error) {
-	if ipns {
-		_, err = c.ExecutePath(c.ipgetPath, []string{"-o", newName, "/ipns/" + address})
-	} else {
-		_, err = c.ExecutePath(c.ipgetPath, []string{"-o", newName, address})
-	}
-	return err
 }
 
 func (c *IPFSController) PublishName(name string) error {
@@ -74,7 +64,7 @@ func (c *IPFSController) PushFolder(path string) error {
 		return errors.New("processing error: " + output)
 	}
 
-	output = output[p + markLen + 1:]
+	output = output[p+markLen+1:]
 	folderHashId := output[:strings.Index(output, " ")]
 	return c.PublishName(folderHashId)
 }
@@ -98,7 +88,7 @@ func (c *IPFSController) PushFile(path string) (string, error) {
 		return "", errors.New("processing error: " + output)
 	}
 
-	output = output[p + markLen + 1:]
+	output = output[p+markLen+1:]
 	fileHashId := output[:strings.Index(output, " ")]
 	return fileHashId, nil
 }

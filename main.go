@@ -56,7 +56,7 @@ func main() {
 		log.Println("stream length is ", time.Duration(int(config.SampleDuration)*(*samplesPtr)))
 	}
 
-	stream := NewLivestream(config.FFmpeg, config.IPFS, config.IPGet, config.SamplesPath, config.SampleDuration)
+	stream := NewLivestream(config.FFmpeg, config.IPFS, config.SamplesPath, config.SampleDuration)
 	err = stream.UseDefaultDevices() // use first devices from the list
 	if err != nil {
 		panic(err)

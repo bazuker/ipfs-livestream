@@ -1,4 +1,4 @@
-# ipfs-livestream (ALPHA)
+# ipfs-livestream [Deprecated]
 
 This program in combination with [IPFS](https://github.com/ipfs/go-ipfs)
 provides a video streaming tool that allows to continuously push parts of the video stream to IPFS network.
